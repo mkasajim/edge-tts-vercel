@@ -1,0 +1,16 @@
+{
+  "name": "edge-tts-vercel",
+  "version": "1.0.0",
+  "description": "Edge TTS API deployed on Vercel",
+  "main": "api/tts.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
