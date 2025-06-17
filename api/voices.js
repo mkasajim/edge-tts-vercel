@@ -42,6 +42,14 @@ async function fetchVoices() {
         voice.Language = voice.Locale.split('-')[0];
       }
       
+      // Add DisplayName and LocaleName for compatibility
+      if (voice.FriendlyName) {
+        voice.DisplayName = voice.FriendlyName;
+      }
+      if (voice.Locale) {
+        voice.LocaleName = voice.Locale;
+      }
+      
       // Clean ContentCategories and VoicePersonalities
       if (voice.VoiceTag) {
         if (voice.VoiceTag.ContentCategories) {
