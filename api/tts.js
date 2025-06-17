@@ -138,15 +138,27 @@ async function handleTTSWebSocket(text, voice, rate, volume, pitch) {
       } else {
         // Binary message - contains audio data
         // Ensure data is properly converted to Buffer
+        if (typeof data === 'string') {
+          console.warn("Received string data in binary WebSocket message handler, skipping.");
+          return;
+        }
         let buffer;
         if (Buffer.isBuffer(data)) {
           buffer = data;
         } else if (data instanceof ArrayBuffer) {
           buffer = Buffer.from(data);
-        } else if (data.buffer instanceof ArrayBuffer) {
+        } else if (data.buffer instanceof ArrayBuffer) { // For Uint8Array and other ArrayBufferViews
           buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
         } else {
-          buffer = Buffer.from(data);
+          console.warn('Unknown data type received in WebSocket binary message:', typeof data, data);
+          // Attempt to convert to Buffer, but this is a potential error source
+          // If this path is taken, it implies an unexpected data format from the server
+          try {
+            buffer = Buffer.from(data); 
+          } catch (e) {
+            console.error('Failed to convert unknown data to Buffer:', e);
+            return; // Skip this message
+          }
         }
         
         if (buffer.length < 2) return;
@@ -171,24 +183,29 @@ async function handleTTSWebSocket(text, voice, rate, volume, pitch) {
     });
     
     ws.on('close', () => {
-      if (audioChunks.length > 0) {
-        try {
-          // Ensure all chunks are proper Buffers before concatenating
-          const validChunks = audioChunks.filter(chunk => 
-            Buffer.isBuffer(chunk) || chunk instanceof Uint8Array || chunk instanceof ArrayBuffer
-          ).map(chunk => Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          
-          if (validChunks.length > 0) {
-            const combined = Buffer.concat(validChunks);
-            resolve(combined);
-          } else {
-            reject(new Error('No valid audio data received'));
+      // Ensure all chunks are proper Buffers before concatenating
+      const trulyValidBuffers = audioChunks.map(chunk => {
+          if (Buffer.isBuffer(chunk)) {
+              return chunk;
+          } else if (chunk instanceof ArrayBuffer) {
+              return Buffer.from(chunk);
+          } else if (chunk && chunk.buffer instanceof ArrayBuffer) { // For Uint8Array and other ArrayBufferViews
+              return Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
           }
-        } catch (error) {
-          reject(new Error(`Failed to combine audio chunks: ${error.message}`));
-        }
+          console.warn('Invalid chunk type in audioChunks before concat:', typeof chunk);
+          return null; // Mark for removal
+      }).filter(chunk => chunk !== null && Buffer.isBuffer(chunk)); // Filter out nulls and ensure it's a Buffer
+
+      if (trulyValidBuffers.length > 0) {
+          const combined = Buffer.concat(trulyValidBuffers);
+          resolve(combined);
       } else {
-        reject(new Error('No audio data received'));
+          // If audioChunks was not empty but trulyValidBuffers is, then all chunks were invalid
+          if (audioChunks.length > 0) {
+               reject(new Error('No valid audio data chunks to combine'));
+          } else {
+               reject(new Error('No audio data received'));
+          }
       }
     });
     

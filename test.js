@@ -306,7 +306,7 @@ class TestRunner {
 // Command line argument parsing
 function parseArgs() {
   const args = process.argv.slice(2);
-  let baseUrl = 'http://localhost:3000';
+  let baseUrl = 'https://edge-tts-three.vercel.app';
   
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--url' && i + 1 < args.length) {
@@ -317,7 +317,7 @@ function parseArgs() {
 Usage: node test.js [options]
 
 Options:
-  --url <url>     Base URL for the API (default: http://localhost:3000)
+  --url <url>     Base URL for the API (default: https://edge-tts-three.vercel.app)
   --help, -h      Show this help message
 
 Examples:
