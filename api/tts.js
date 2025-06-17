@@ -137,7 +137,17 @@ async function handleTTSWebSocket(text, voice, rate, volume, pitch) {
         }
       } else {
         // Binary message - contains audio data
-        const buffer = Buffer.from(data);
+        // Ensure data is properly converted to Buffer
+        let buffer;
+        if (Buffer.isBuffer(data)) {
+          buffer = data;
+        } else if (data instanceof ArrayBuffer) {
+          buffer = Buffer.from(data);
+        } else if (data.buffer instanceof ArrayBuffer) {
+          buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+        } else {
+          buffer = Buffer.from(data);
+        }
         
         if (buffer.length < 2) return;
         
@@ -154,16 +164,29 @@ async function handleTTSWebSocket(text, voice, rate, volume, pitch) {
         const { headers } = parseMessage(headerText);
         
         if (headers.Path === 'audio' && headers['Content-Type'] === 'audio/mpeg') {
-          audioChunks.push(audioData);
+          // Ensure audioData is a proper Buffer before pushing
+          audioChunks.push(Buffer.from(audioData));
         }
       }
     });
     
     ws.on('close', () => {
       if (audioChunks.length > 0) {
-        // Combine all audio chunks
-        const combined = Buffer.concat(audioChunks);
-        resolve(combined);
+        try {
+          // Ensure all chunks are proper Buffers before concatenating
+          const validChunks = audioChunks.filter(chunk => 
+            Buffer.isBuffer(chunk) || chunk instanceof Uint8Array || chunk instanceof ArrayBuffer
+          ).map(chunk => Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          
+          if (validChunks.length > 0) {
+            const combined = Buffer.concat(validChunks);
+            resolve(combined);
+          } else {
+            reject(new Error('No valid audio data received'));
+          }
+        } catch (error) {
+          reject(new Error(`Failed to combine audio chunks: ${error.message}`));
+        }
       } else {
         reject(new Error('No audio data received'));
       }
